@@ -13,6 +13,8 @@ import time
 from common_conf import STATES_TO_IX, UNK_TAG, START_TAG, STOP_TAG
 from HMM import get_word_states
 
+PADDING_IDX = 0  # can not change
+PADDING_TAG = "<PAD>"
 torch.manual_seed(1)
 
 def to_scalar(var):
@@ -47,7 +49,7 @@ class BiLSTM_CRF(nn.Module):
         self.tag_to_ix = tag_to_ix
         self.tagset_size = len(tag_to_ix)
 
-        self.word_embeds = nn.Embedding(vocab_size, embedding_dim)
+        self.word_embeds = nn.Embedding(vocab_size, embedding_dim, PADDING_IDX)
         self.lstm = nn.LSTM(embedding_dim, hidden_dim // 2,
                             num_layers=1, bidirectional=True)
 
@@ -70,11 +72,12 @@ class BiLSTM_CRF(nn.Module):
         return (autograd.Variable(torch.randn(2, 1, self.hidden_dim // 2)),
                 autograd.Variable(torch.randn(2, 1, self.hidden_dim // 2)))
 
-    def _forward_alg(self, feats):
+    def _forward_alg(self, feats, lstm_out_lens):
         # Do the forward algorithm to compute the partition function
-        init_alphas = torch.Tensor(1, self.tagset_size).fill_(-10000.)
+        init_alphas = torch.Tensor(feats.size()[1], self.tagset_size).fill_(-10000.)
         # START_TAG has all of the score.
-        init_alphas[0][self.tag_to_ix[START_TAG]] = 0.
+        index = torch.LongTensor([self.tag_to_ix[START_TAG]])
+        init_alphas.index_fill_(1, index, 0)
 
         # Wrap in a variable so that we will get automatic backprop
         forward_var = autograd.Variable(init_alphas)
@@ -101,13 +104,23 @@ class BiLSTM_CRF(nn.Module):
         alpha = log_sum_exp(terminal_var)
         return alpha
 
-    def _get_lstm_features(self, sentence):
-        self.hidden = self.init_hidden()
-        embeds = self.word_embeds(sentence).view(len(sentence), 1, -1)
-        lstm_out, self.hidden = self.lstm(embeds, self.hidden)
-        lstm_out = lstm_out.view(len(sentence), self.hidden_dim)
-        lstm_feats = self.hidden2tag(lstm_out)
-        return lstm_feats
+    def _get_lstm_features(self, sentence, is_train=False, sentence_len=[]):
+        if not is_train:
+            self.hidden = self.init_hidden()
+            embeds = self.word_embeds(sentence).view(len(sentence), 1, -1)
+            lstm_out, self.hidden = self.lstm(embeds, self.hidden)
+            lstm_out = lstm_out.view(len(sentence), self.hidden_dim)
+            lstm_feats = self.hidden2tag(lstm_out)
+            return lstm_feats
+        else:
+            self.hidden = self.init_hidden()
+            embeds = self.word_embeds(sentence).view(len(sentence[0]), len(sentence), -1)
+            embeds_p = torch.nn.utils.rnn.pack_padded_sequence(embeds, sentence_len)
+            lstm_out_p, self.hidden = self.lstm(embeds_p, None)
+            lstm_out, lstm_out_lens = torch.nn.utils.rnn.pad_packed_sequence(lstm_out_p)
+            lstm_feats = self.hidden2tag(lstm_out)
+            print('lstm_feats size:', lstm_feats.size())
+            return lstm_feats, lstm_out_lens
 
     def _score_sentence(self, feats, tags):
         # Gives the score of a provided tag sequence
@@ -163,10 +176,10 @@ class BiLSTM_CRF(nn.Module):
         best_path.reverse()
         return path_score, best_path
 
-    def neg_log_likelihood(self, sentence, tags):
-        feats = self._get_lstm_features(sentence)
-        forward_score = self._forward_alg(feats)
-        gold_score = self._score_sentence(feats, tags)
+    def neg_log_likelihood(self, sentence_batch, tags_batch, raw_len_batch):
+        feats, lstm_out_lens = self._get_lstm_features(sentence_batch, True, raw_len_batch)
+        forward_score = self._forward_alg(feats, lstm_out_lens)
+        gold_score = self._score_sentence(feats, tags_batch)
         return forward_score - gold_score
 
     def forward(self, sentence):  # dont confuse this with _forward_alg above.
@@ -180,7 +193,7 @@ class BiLSTM_CRF(nn.Module):
 def prepare_train_data(corpus_file, sep):
     sentence_list = []
     word_state_list = []
-    word_to_ix = {}
+    word_to_ix = {PADDING_TAG:PADDING_IDX}
 
     with open(corpus_file) as fopen:
         for line in fopen:
@@ -201,9 +214,39 @@ def prepare_train_data(corpus_file, sep):
     word_to_ix[UNK_TAG] = len(word_to_ix)
     return word_to_ix, sentence_list, word_state_list
 
+def do_pack(sentence_batch, tags_batch, word_to_ix, tag_to_ix):
+    raw_len_batch = np.array([len(_) for _ in sentence_batch])
+
+    # add packing elem
+    max_len = np.max(raw_len_batch)
+    sentence_batch_packed = []
+    tags_batch_packed = []
+    for idx in range(len(sentence_batch)):
+        sentence = [word_to_ix[_] for _ in sentence_batch[idx]]
+        if len(sentence) < max_len:
+            sentence += [PADDING_IDX] * (max_len-len(sentence))
+        sentence_batch_packed.append(sentence)
+        tags = [tag_to_ix[_] for _ in tags_batch[idx]]
+        if len(tags) < max_len:
+            tags += [PADDING_IDX] * (max_len-len(tags))
+        tags_batch_packed.append(tags)
+    sentence_batch_packed = np.array(sentence_batch_packed)
+    tags_batch_packed = np.array(tags_batch_packed)
+
+    # sort by length
+    sorted_idx_list = np.argsort(-raw_len_batch)
+    sentence_batch_packed = sentence_batch_packed[sorted_idx_list]
+    tags_batch_packed = tags_batch_packed[sorted_idx_list]
+    raw_len_batch = raw_len_batch[sorted_idx_list]
+
+    sentence_batch_packed = autograd.Variable(torch.LongTensor(sentence_batch_packed))
+    tags_batch_packed = torch.LongTensor(tags_batch_packed)
+    return sentence_batch_packed, tags_batch_packed, raw_len_batch
+
 if __name__ == '__main__':
     EMBEDDING_DIM = 64
     HIDDEN_DIM = 50
+    batch_size = 128
 
     # Make up some training data
     word_to_ix, sentence_list, word_state_list = prepare_train_data('./icwb2-data/training/pku_training.utf8', '  ')
@@ -215,13 +258,26 @@ if __name__ == '__main__':
     print(model)
 
     # Make sure prepare_sequence from earlier in the LSTM section is loaded
-    print_per_batch = 32
     for epoch in range(10):
         print("[%s] Epoch#%d:" % (time.ctime(), epoch))
         loss_list = []
-        for idx_m in range(len(sentence_list)):
-            sentence = sentence_list[idx_m]
-            tags = word_state_list[idx_m]
+        idx_shuffled = list(range(len(sentence_list)))
+        random.shuffle(idx_shuffled)
+        sentence_batch = []
+        tags_batch = []
+        batch_count = 0
+        for idx_m in idx_shuffled:
+            batch_count += 1
+            sentence_batch.append(sentence_list[idx_m])
+            tags_batch.append(word_state_list[idx_m])
+            if batch_count % batch_size == 0:  #TODO: last batch maybe less than batch_size
+                sentence_batch_packed, tags_batch_packed, raw_len_batch = do_pack(sentence_batch, tags_batch, word_to_ix, tag_to_ix)
+                neg_log_likelihood = model.neg_log_likelihood(sentence_batch_packed, tags_batch_packed, raw_len_batch)
+                sentence_batch = []
+                tags_batch = []
+            
+
+            """
             # Step 1. Remember that Pytorch accumulates gradients.
             # We need to clear them out before each instance
             model.zero_grad()
@@ -244,6 +300,7 @@ if __name__ == '__main__':
                 sys.stdout.write('\rbatch #%d, train loss:%s' % (idx_m, np.mean(loss_list)))
                 sys.stdout.flush()
                 loss_list = []
+            """
 
         # store params
         torch.save(model.state_dict(), './models/BiLSTM_RNN_params_%d.pkl' % (epoch))
