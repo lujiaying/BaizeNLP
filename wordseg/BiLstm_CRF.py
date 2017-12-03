@@ -133,6 +133,7 @@ class BiLSTM_CRF(nn.Module):
         return score
 
     def _viterbi_decode(self, feats):
+        #TODO: implement CRF layer as a class
         backpointers = []
 
         # Initialize the viterbi variables in log space
