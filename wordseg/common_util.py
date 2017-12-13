@@ -38,4 +38,6 @@ def convert_path2segments(sentence, path):
         if path[idx] == 'S' or path[idx] == 'E':
             segments.append(seg)
             seg = ''
+    if len(seg) != 0:
+        segments.append(seg)
     return segments

@@ -10,8 +10,8 @@ import random
 import numpy as np
 import sys
 import time
-from common_conf import STATES_TO_IX, UNK_TAG, START_TAG, STOP_TAG
-from common_util import get_word_states
+from wordseg.common_conf import STATES_TO_IX, UNK_TAG, START_TAG, STOP_TAG
+from wordseg.common_util import get_word_states
 
 torch.manual_seed(1)
 

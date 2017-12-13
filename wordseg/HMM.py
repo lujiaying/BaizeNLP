@@ -3,8 +3,8 @@
 from __future__ import division
 import math
 from collections import defaultdict
-import common_conf
-import common_util
+from wordseg import common_conf
+from wordseg import common_util
 
 class HMM(object):
 
@@ -150,11 +150,3 @@ class HMM(object):
 
         (prob, state) = max([(V[len(sentence)-1][s], s) for s in common_conf.STATES])
         return prob, path[state]
-
-if __name__ == '__main__':
-    sentence = '南京市长江大桥'
-    hmm_ins = HMM()
-    hmm_ins.train('./icwb2-data/training/pku_training.utf8', '  ')
-    prob, path = hmm_ins.infer(sentence)
-    print('sentence: %s, prob:%s, h-state:%s' % (sentence, prob, '->'.join(path)))
-    print(hmm_ins.cut(sentence))
