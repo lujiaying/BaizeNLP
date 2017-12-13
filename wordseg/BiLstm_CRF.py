@@ -11,7 +11,7 @@ import numpy as np
 import sys
 import time
 from common_conf import STATES_TO_IX, UNK_TAG, START_TAG, STOP_TAG
-from HMM import get_word_states
+from common_util import get_word_states
 
 torch.manual_seed(1)
 
