@@ -104,6 +104,8 @@ class EntropyBasedWorddiscovery(object):
             self._word_info[word]['score_freq'] = d['score'] * self._trie.find(word)
 
     def _build_trie(self, sentences):
+        self._trie.clear()
+        self._trie_reversed.clear()
         default_logger.debug("Building trie tree...")
         start_t = time.time()
         for s in sentences:
@@ -155,11 +157,11 @@ class EntropyBasedWorddiscovery(object):
 if __name__ == '__main__':
     discover = EntropyBasedWorddiscovery()
     
-    #discover.parse("""
-    #每天都有网友问我：2017年做淘宝客还赚钱吗？我：2017年做淘宝客还可以继续好好做。各大门户虽然也跟我们小站长共分一杯羹，但是毕竟我们可以推广的商品太多了，现在网民购物的也越来越多了，所以淘宝客依然还有很大的发展空间。至少未来两三年内淘宝客大格局估计不会有太大变化。所以就淘宝客赚钱的这一话题，谈谈自己的一些看法。
-    #纵观这两年的所有网上兼职的工作，淘宝客算的上是最给力的，是最适合个人站长操作的项目，它实现了淘宝、网店商家、个人站长（淘宝客）三方共赢的良好局面，就连各大门户现在也在操作淘宝客。
-    #但很多人都在说淘客赚不到钱了，为什么做了那么多淘宝客的网站，最后赚钱的就一个呢？让我来跟大家分析一下原因。
-    #""", debug=False)
+    discover.parse("""
+    每天都有网友问我：2017年做淘宝客还赚钱吗？我：2017年做淘宝客还可以继续好好做。各大门户虽然也跟我们小站长共分一杯羹，但是毕竟我们可以推广的商品太多了，现在网民购物的也越来越多了，所以淘宝客依然还有很大的发展空间。至少未来两三年内淘宝客大格局估计不会有太大变化。所以就淘宝客赚钱的这一话题，谈谈自己的一些看法。
+    纵观这两年的所有网上兼职的工作，淘宝客算的上是最给力的，是最适合个人站长操作的项目，它实现了淘宝、网店商家、个人站长（淘宝客）三方共赢的良好局面，就连各大门户现在也在操作淘宝客。
+    但很多人都在说淘客赚不到钱了，为什么做了那么多淘宝客的网站，最后赚钱的就一个呢？让我来跟大家分析一下原因。
+    """, debug=False)
 
     #discover.parse("四是四，十是十；十四是十四，四十是四十~来自《绕口令大全》。")
 
@@ -180,5 +182,5 @@ if __name__ == '__main__':
     #print(discover._trie_reversed.get_children_char_count('令口'))
 
     #discover.parse_file('./xiyouji.txt')
-    discover.parse_file('./xijinping.txt')
+    #discover.parse_file('./xijinping.txt')
     print('\n'.join(discover.get_new_words(30)))

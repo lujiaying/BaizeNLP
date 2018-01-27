@@ -79,3 +79,6 @@ class CharTrie(object):
             for child in node.children.values():
                 children.append((child.value, child.count))
         return children
+
+    def clear(self):
+        self._root = _TrieNode()
