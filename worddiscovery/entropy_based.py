@@ -29,13 +29,18 @@ class EntropyBasedWorddiscovery(object):
     def __init__(self, word_max_len=5):
         self._trie = CharTrie()
         self._trie_reversed = CharTrie()  # for left char entropy calculate
-        self.word_max_len = word_max_len
         self._word_info = defaultdict(dict)
+        self.word_max_len = word_max_len
 
         self.WORD_MIN_LEN = 2
         self.WORD_MIN_FREQ = 2
         self.WORD_MIN_PMI = 4
         self.WORD_MIN_NEIGHBOR_ENTROPY = 0
+
+    def clear(self):
+        self._trie.clear()
+        self._trie_reversed.clear()
+        self._word_info = defaultdict(dict)
 
     def parse_file(self, file_name, debug=False):
         with open(file_name) as fopen:
@@ -43,6 +48,7 @@ class EntropyBasedWorddiscovery(object):
             self.parse(document_text, debug)
 
     def parse(self, document_text, debug=False):
+        self.clear()
         sentences = self._preprocess(document_text)
         self._build_trie(sentences)
         self.cal_aggregation(debug)
@@ -104,8 +110,6 @@ class EntropyBasedWorddiscovery(object):
             self._word_info[word]['score_freq'] = d['score'] * self._trie.find(word)
 
     def _build_trie(self, sentences):
-        self._trie.clear()
-        self._trie_reversed.clear()
         default_logger.debug("Building trie tree...")
         start_t = time.time()
         for s in sentences:
