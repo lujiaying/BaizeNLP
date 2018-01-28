@@ -21,12 +21,12 @@ default_logger.setLevel(logging.DEBUG)
 default_logger.addHandler(log_console)
 
 MAX_INT = 9223372036854775807
-RE_SENTENCE_SEPERATOR = r'[,.:;?!\~\-_()[\]<>，、。：；？！~-——（）【】《》\s]\s*'
-RE_PUNCTUATION_TO_CLEAN = r'[＃＊＝＋/｜‘’“”￥#*=+\\|\'"^$%`]'
+RE_SENTENCE_SEPERATOR = r'[\n\r]\s*'
+RE_PUNCTUATION_TO_CLEAN = r'[.:;?!\~,\-_()[\]<>。：；？！~，、——（）【】《》＃＊＝＋/｜‘’“”￥#*=+\\|\'"^$%`]'
 
 
 class EntropyBasedWorddiscovery(object):
-    def __init__(self, word_max_len=5):
+    def __init__(self, word_max_len=6):
         self._trie = CharTrie()
         self._trie_reversed = CharTrie()  # for left char entropy calculate
         self._word_info = defaultdict(dict)
@@ -34,7 +34,7 @@ class EntropyBasedWorddiscovery(object):
 
         self.WORD_MIN_LEN = 2
         self.WORD_MIN_FREQ = 2
-        self.WORD_MIN_PMI = 4
+        self.WORD_MIN_PMI = 6
         self.WORD_MIN_NEIGHBOR_ENTROPY = 0
 
     def clear(self):
@@ -53,7 +53,7 @@ class EntropyBasedWorddiscovery(object):
         self._build_trie(sentences)
         self.cal_aggregation(debug)
         self.cal_neighbor_char_entropy(debug)
-        self.cal_score()
+        self.cal_score(debug)
 
     def get_new_words(self, top=20):
         default_logger.debug("Start sorting to get new words...")
@@ -104,9 +104,12 @@ class EntropyBasedWorddiscovery(object):
                     self._word_info.pop(word)
         default_logger.debug("Neighbor entropy has been calculated succesfully, which costs %.3f seconds" % (time.time()-start_t))
 
-    def cal_score(self):
+    def cal_score(self, debug):
         for word, d in self._word_info.items():
             self._word_info[word]['score'] = d['aggreg'] + d['nbr_entropy']
+            if debug:
+                if d['nbr_entropy'] <= self.WORD_MIN_NEIGHBOR_ENTROPY:
+                    self._word_info[word]['score'] = 0.0
             self._word_info[word]['score_freq'] = d['score'] * self._trie.find(word)
 
     def _build_trie(self, sentences):
@@ -159,32 +162,18 @@ class EntropyBasedWorddiscovery(object):
         return entropy
 
 if __name__ == '__main__':
-    discover = EntropyBasedWorddiscovery()
-    
+    discover = EntropyBasedWorddiscovery(word_max_len=6)
+
     discover.parse("""
-    每天都有网友问我：2017年做淘宝客还赚钱吗？我：2017年做淘宝客还可以继续好好做。各大门户虽然也跟我们小站长共分一杯羹，但是毕竟我们可以推广的商品太多了，现在网民购物的也越来越多了，所以淘宝客依然还有很大的发展空间。至少未来两三年内淘宝客大格局估计不会有太大变化。所以就淘宝客赚钱的这一话题，谈谈自己的一些看法。
-    纵观这两年的所有网上兼职的工作，淘宝客算的上是最给力的，是最适合个人站长操作的项目，它实现了淘宝、网店商家、个人站长（淘宝客）三方共赢的良好局面，就连各大门户现在也在操作淘宝客。
-    但很多人都在说淘客赚不到钱了，为什么做了那么多淘宝客的网站，最后赚钱的就一个呢？让我来跟大家分析一下原因。
-    """, debug=False)
-
-    #discover.parse("四是四，十是十；十四是十四，四十是四十~来自《绕口令大全》。")
-
-    #print(discover._trie.find('四'))
-    #print(discover._trie.find('四十'))
-    #print(discover._trie.find('四十是四十'))
-    #print(discover._trie.find('来自'))
-    #print(discover._trie_reversed.find('四'))
-    #print(discover._trie_reversed.find('四十'))
-    #print(discover._trie_reversed.find('自来'))
+    自然语言处理是计算机科学领域与人工智能领域中的一个重要方向。它研究能实现人与计算机之间用自然语言进行有效通信的各种理论和方法。自然语言处理是一门融语言学、计算机科学、数学于一体的科学。因此，这一领域的研究将涉及自然语言，即人们日常使用的语言，所以它与语言学的研究有着密切的联系，但又有重要的区别。自然语言处理并不是一般地研究自然语言，而在于研制能有效地实现自然语言通信的计算机系统，特别是其中的软件系统。因而它是计算机科学的一部分。
+自然语言处理（NLP）是计算机科学，人工智能，语言学关注计算机和人类（自然）语言之间的相互作用的领域。
+   """, debug=True)
 
     #for word, count in discover._trie.get_all_words():
     #    print(word, count)
     #for node, prefix in discover._trie.traverse():
     #    print(node, prefix)
+    for word, d in discover._word_info.items():
+        print(word, d['aggreg'], d['nbr_entropy'], discover._trie.find(word))
 
-    #print(discover._trie.get_children_char_count('口令'))
-    #print(discover._trie_reversed.get_children_char_count('令口'))
-
-    #discover.parse_file('./xiyouji.txt')
-    #discover.parse_file('./xijinping.txt')
-    print('\n'.join(discover.get_new_words(30)))
+    print('\n'.join(discover.get_new_words(10)))
