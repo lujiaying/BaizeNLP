@@ -2,11 +2,11 @@
 
 Baize is a mythical hooved chimerical creature known in Chinese, which knows every dialect and neologism of world.
 
-## 分词
+## Word segmentation
 
 BaizeNLP provides Chinese word segmentation function. The algorithm is based on a hybrid method of n-gram language model and HMM model.
 
-## 新词挖掘
+## New word discovering
 
 [Web Demo >>](https://baizenlp.leanapp.cn/baize/)
 [More details for this project >>](http://lujiaying.github.io/2018/01/28/%E5%9F%BA%E4%BA%8E%E7%BB%9F%E8%AE%A1%E4%BF%A1%E6%81%AF%E7%9A%84%E6%96%B0%E8%AF%8D%E6%8C%96%E6%8E%98%E5%AE%9E%E8%B7%B5/)
